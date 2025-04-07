@@ -1,0 +1,130 @@
+// MindfulnessApp.jsx
+import { useState, useEffect } from "react";
+
+const modules = [
+  ...Array.from({ length: 7 }, (_, i) => ({
+    day: i + 1,
+    type: "Body Scan",
+    audio: `body_scan_day${i + 1}.mp3`,
+  })),
+  ...Array.from({ length: 7 }, (_, i) => ({
+    day: i + 8,
+    type: "Mindful Breathing",
+    audio: `breathing_day${i + 1}.mp3`,
+  })),
+];
+
+export default function MindfulnessApp() {
+  const [currentDay, setCurrentDay] = useState(1);
+  const [playedToday, setPlayedToday] = useState(false);
+  const [surveyDone, setSurveyDone] = useState(false);
+  const [journalEntry, setJournalEntry] = useState("");
+  const [playedMinutes, setPlayedMinutes] = useState(0);
+
+  useEffect(() => {
+    const savedDay = parseInt(localStorage.getItem("currentDay")) || 1;
+    const data = JSON.parse(localStorage.getItem(`day${savedDay}`)) || {};
+    setCurrentDay(savedDay);
+    setPlayedToday(data.played || false);
+    setSurveyDone(data.survey || false);
+    setJournalEntry(data.journal || "");
+    setPlayedMinutes(data.minutes || 0);
+  }, []);
+
+  const handlePlay = () => {
+    const audio = document.getElementById("audio");
+    audio.play();
+    const interval = setInterval(() => {
+      setPlayedMinutes((m) => {
+        const updated = m + 1;
+        if (updated >= 10) {
+          setPlayedToday(true);
+          clearInterval(interval);
+        }
+        return updated;
+      });
+    }, 60000);
+  };
+
+  const handleSurveyClick = () => {
+    setSurveyDone(true);
+    saveProgress(true);
+  };
+
+  const saveProgress = (surveyUpdate = false) => {
+    const data = {
+      played: playedToday,
+      survey: surveyUpdate ? true : surveyDone,
+      journal: journalEntry,
+      minutes: playedMinutes,
+    };
+    localStorage.setItem(`day${currentDay}`, JSON.stringify(data));
+    localStorage.setItem("currentDay", currentDay);
+  };
+
+  const nextDay = () => {
+    if (currentDay < 14) {
+      const next = currentDay + 1;
+      setCurrentDay(next);
+      const data = JSON.parse(localStorage.getItem(`day${next}`)) || {};
+      setPlayedToday(data.played || false);
+      setSurveyDone(data.survey || false);
+      setJournalEntry(data.journal || "");
+      setPlayedMinutes(data.minutes || 0);
+      localStorage.setItem("currentDay", next);
+    }
+  };
+
+  const module = modules.find((m) => m.day === currentDay);
+
+  return (
+    <div className="max-w-xl mx-auto p-4 space-y-4">
+      <h1 className="text-2xl font-bold">Day {currentDay}: {module.type}</h1>
+      <audio id="audio" src={module.audio} controls onPlay={handlePlay} />
+      <p className="text-sm">Listen for at least 10 minutes.</p>
+      {playedToday && <p className="text-green-600">✔️ Audio Completed</p>}
+
+      <textarea
+        className="w-full border p-2 rounded"
+        placeholder="Write your journal entry here..."
+        value={journalEntry}
+        onChange={(e) => setJournalEntry(e.target.value)}
+        onBlur={saveProgress}
+      />
+
+      <a
+        href="https://your.qualtrics.survey.link"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-block bg-blue-500 text-white px-4 py-2 rounded"
+        onClick={handleSurveyClick}
+      >
+        Submit Daily Survey
+      </a>
+      {surveyDone && <p className="text-green-600">✔️ Survey Completed</p>}
+
+      <button
+        className="bg-gray-800 text-white px-4 py-2 rounded"
+        onClick={nextDay}
+        disabled={currentDay >= 14}
+      >
+        Next Day
+      </button>
+
+      <div className="mt-4 border-t pt-4">
+        <h2 className="font-semibold">Your Progress:</h2>
+        <ul className="text-sm">
+          {modules.map((m) => {
+            const d = JSON.parse(localStorage.getItem(`day${m.day}`)) || {};
+            return (
+              <li key={m.day}>
+                Day {m.day} - {m.type}:
+                {d.played ? " 🎧" : " ❌"} {d.survey ? "📝" : " ❌"}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </div>
+  );
+}
